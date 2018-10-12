@@ -25,21 +25,21 @@ func getArgs(args *Args) {//读取
 	flag.BoolVarP(&args.f, "final", "f", false, "final")
 	flag.StringVarP(&args.d, "destination", "d", "", "destination")
 	flag.Parse()
-	otherArgs := flag.Args()
-	if len(otherArgs) > 0 {
-		args.inputFile = otherArgs[0]
+	inputFiles := flag.Args()
+	if len(inputFiles) > 0 {
+		args.inputFile = inputFiles[0]
 	} else {
 		args.inputFile = ""
 	}
 	checkArgs(args)//检验合法性
 }
 func checkArgs(args *Args) {//合法性检验
-	if args.s == 0 || args.e == 0 {
+	if args.s == 0 || args.e == 0 {//未输入参数
 		os.Stderr.Write([]byte("Please input -s and -e\n"))
 		os.Exit(0)
 	}
-	if args.s > args.e {
-		os.Stderr.Write([]byte("Invalid input about -s and -e\n"))
+	if args.s > args.e {//参数不合法
+		os.Stderr.Write([]byte("Invalid input\n"))
 		os.Exit(0)
 	}
 	if args.f && args.l != -1 {
@@ -66,18 +66,19 @@ func executeArgs(args *Args) {
 	var reader *bufio.Reader
 	reader = getReader(args)//获取reader
 	//get writer
+	if args.l == -1 {
+		args.l = 72//默认七十二行
+	}
 	if args.d == "" {
 		writer := bufio.NewWriter(os.Stdout)
 		if args.f {
 			readByF(args, reader, writer)
 		} else {
-			if args.l == -1 {
-				args.l = 72//默认七十二行
-			}
-			readByLine(args, reader, writer)//selpg -s1 -e1 -l
+
+			readByLine(args, reader, writer)//selpg -s1 -e1 filename
 		}
 	} else {
-		var cmd = exec.Command("./" + args.d)
+		var cmd = exec.Command("./" + args.d)//执行子进程
 		writer, err := cmd.StdinPipe()//通过管道连接子进程
 		if err != nil {
 			fmt.Println("Error", err)
@@ -90,9 +91,6 @@ func executeArgs(args *Args) {
 		if args.f {
 			readByFWithDestination(args, reader, writer)//按照分页符读取selpg -s1 -e1 -f
 		} else {
-			if args.l == -1 {
-				args.l = 72
-			}
 			readByLWithDestination(args, reader, writer)//selpg -s1 -e1 -l [process_name]
 		}
 		writer.Close()
@@ -101,15 +99,16 @@ func executeArgs(args *Args) {
 			os.Exit(1)
 		}
 	}
+
 }
 func readByLine(args *Args, reader *bufio.Reader, writer *bufio.Writer) {//从start读到end
 	for  i := 1; i <= args.e; i++ {
 		if i < args.s {
-			for lineCount := 0; lineCount < args.l; lineCount++ {
+			for j := 0; j < args.l; j++ {
 				reader.ReadBytes('\n')
 			}
 		} else {
-			for lineCount := 0; lineCount < args.l; lineCount++ {
+			for j := 0; j < args.l; j++ {
 				line, err := reader.ReadBytes('\n')
 				if err != nil {
 					if err == io.EOF {
@@ -125,10 +124,11 @@ func readByLine(args *Args, reader *bufio.Reader, writer *bufio.Writer) {//从st
 			}
 		}
 	}
+	fmt.Printf("success")
 }
 
 func readByF(args *Args, reader *bufio.Reader, writer *bufio.Writer) {
-	for pageCount := 1; pageCount <= args.e; pageCount++ {
+	for i := 1; i <= args.e; i++ {
 		for {
 			char, err := reader.ReadByte()
 			if char == '\f' {
@@ -143,22 +143,23 @@ func readByF(args *Args, reader *bufio.Reader, writer *bufio.Writer) {
 				os.Stderr.Write([]byte("Read failed\n"))
 				os.Exit(1)
 			}
-			if pageCount >= args.s {
+			if i >= args.s {
 				writer.WriteByte(char)
 				writer.Flush()//清空buffer
 			}
 		}
 	}
+	fmt.Printf("success")
 }
 
 func readByLWithDestination(args *Args, reader *bufio.Reader, writer io.WriteCloser) {
-	for pageCount := 1; pageCount <= args.e; pageCount++ {
-		if pageCount < args.s {
-			for lineCount := 0; lineCount < args.l; lineCount++ {
+	for i := 1; i <= args.e; i++ {
+		if i < args.s {
+			for j := 0; j < args.l; j++ {
 				reader.ReadBytes('\n')
 			}
 		} else {
-			for lineCount := 0; lineCount < args.l; lineCount++ {
+			for j := 0; j < args.l; j++ {
 				line, err := reader.ReadBytes('\n')
 				if err != nil {
 					if err == io.EOF {
@@ -171,10 +172,11 @@ func readByLWithDestination(args *Args, reader *bufio.Reader, writer io.WriteClo
 			}
 		}
 	}
+	fmt.Printf("success")
 }
 
 func readByFWithDestination(args *Args, reader *bufio.Reader, writer io.WriteCloser) {
-	for pageCount := 1; pageCount <= args.e; pageCount++ {
+	for i := 1; i <= args.e; i++ {
 		for {
 			char, err := reader.ReadByte()
 			if char == '\f' {
@@ -187,11 +189,12 @@ func readByFWithDestination(args *Args, reader *bufio.Reader, writer io.WriteClo
 				os.Stderr.Write([]byte("Read failed\n"))
 				os.Exit(1)
 			}
-			if pageCount >= args.s {
+			if i >= args.s {
 				writer.Write([]byte{char})
 			}
 		}
 	}
+	fmt.Printf("success")
 }
 func main() {
 	args := new(Args)
